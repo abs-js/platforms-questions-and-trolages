@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platforms, questions and trols</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+<script>
+(function() {
+    // Variáveis globais
+    let player;
+    let platforms = [];
+    let invisibleBlocks = [];
+    let platformsGroup; // Variável global para grupos de plataformas
+    let invisibleBlocksGroup; // Variável global para grupos de blocos invisíveis
+    let questionMarksGroup; // Variável global para o grupo de objetos de interrogação
+
+    // Configurações do jogo
+    const config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 500 }, // Gravidade para simular pulos
+                debug: false // Mudar para true para ver as colisões
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    const game = new Phaser.Game(config);
+
+    function preload() {
+        this.load.image('player', 'player.png');
+        this.load.image('platform', 'platform.png');
+        this.load.image('invisibleBlock', 'invisibleBlock.png');
+        this.load.image('questionMark', 'questionMark.png'); // Nova imagem para o objeto de interrogação
+    }
+
+    function create() {
+    let background = this.add.rectangle(-99999, 900, 99999 * 5, 99999 * 5, 0x7777ff);
+
+        // Criar grupo estático para plataformas
+        platformsGroup = this.physics.add.staticGroup();
+
+        // Exemplo de criação de plataformas
+        createPlatform(200, 600, 10, 1);
+        createPlatform(700, 600, 10, 1);
+        createPlatform(-700, 300, 10, 1);
+        createPlatform(-900, 200, 5, 1);
+        createPlatform(-700, 100, 5, 1);
+        createPlatform(-950, 0, 5, 1);
+        createPlatform(-700, -100, 6, 1);
+        createPlatform(-450, -100, 5, 1);
+        createPlatform(-200, -100, 5, 1);
+
+        // Criar grupo estático para blocos invisíveis
+        invisibleBlocksGroup = this.physics.add.staticGroup();
+
+        // Exemplo de criação de blocos invisíveis
+        createInvisibleBlock(100, 500);
+        createInvisibleBlock(132, 500);
+        createInvisibleBlock(164, 500);
+        createInvisibleBlock(400, 500);
+        createInvisibleBlock(710, 386);
+        createInvisibleBlock(-800, 100, (call) => {
+            createQuestionMark(-800 + 32, 68, (call) => {
+                alert("- you: it's false -_-");
+                createInvisibleBlock(-700, -68, (call) => {
+                    createQuestionMark(-150, -132, (call) => {
+                        createPlatform(-900, -100, 5, 1);
+                        createPlatform(-1150, -100, 5, 1);
+                        createPlatform(-1400, 100, 5, 5);
+                    })
+                });
+            })
+        });
+
+        // Criar grupo estático para objetos de interrogação
+        questionMarksGroup = this.physics.add.staticGroup();
+
+        // Exemplo de criação de objetos de interrogação com função específica
+        createQuestionMark(840, 560, function() {
+            createPlatform(1000, 500, 10, 1);
+        });
+
+        createQuestionMark(-290, 460, function(call) {
+                player.setFlipY(true);
+                setTimeout(function() {
+                    player.setFlipY(false)
+                }, 4000);
+        });
+
+        createQuestionMark(1150, 460, function() {
+            createPlatform(-200, 500, 10, 1);
+            createInvisibleBlock(1100, 360, function(call) {
+                createPlatform(-200, 400, 10, 1);
+                platforms[1].disableBody(true, true);
+            });
+        });
+
+        createQuestionMark(-1340, 0, function() {
+            platforms.forEach((platform, index) => {
+                if (index % 2 === 0) {
+                    platform.disableBody(true, true);
+                }
+            })
+        });
+
+        createQuestionMark(-1340 - 96, 0, function() {
+            createPlatform(950, 400, 5, 1);
+            createPlatform(1050, 300, 5, 1);
+            createPlatform(1150, 200, 5, 1);
+            createPlatform(1250, 100, 5, 1);
+            player.setVelocityY(-1000);
+            createPlatform(700, 600, 10, 1);
+        });
+
+        flag = this.physics.add.staticGroup();
+        flag.create(1300, 60, 'flag').setScale(0.5, 1).refreshBody();
+
+        // Adicionar o jogador
+        player = this.physics.add.sprite(100, 550, 'player');
+        player.setBounce(0.2); // Fator de "rebote" ao cair
+        player.setCollideWorldBounds(false); // Remover colisão com as bordas do mundo para permitir o foco de câmera
+
+        // Configurar câmera para seguir o jogador
+        this.cameras.main.startFollow(player);
+        this.cameras.main.setBounds(-Infinity, -200, Infinity, 1200); // Definir os limites da câmera
+
+        // Configurar colisões entre o jogador, plataformas e blocos invisíveis
+        this.physics.add.collider(player, platformsGroup);
+
+        // Configurar interações entre jogador e objetos de interrogação
+        this.physics.add.overlap(player, questionMarksGroup, collectQuestionMark, null, this);
+
+        this.physics.add.collider(player, flag, win, null, this);
+
+        startTime = new Date();
+    }
+
+    // Função auxiliar para criar uma plataforma e armazená-la no array
+    function createPlatform(x, y, scaleX, scaleY) {
+        let platform = platformsGroup.create(x, y, 'platform').setScale(scaleX, scaleY).refreshBody();
+        platforms.push(platform);
+    }
+
+    // Função auxiliar para criar um bloco invisível e armazená-lo no array
+    function createInvisibleBlock(x, y, f) {
+        let invisibleBlock = invisibleBlocksGroup.create(x, y, 'invisibleBlock').setVisible(false).setActive(false);
+        invisibleBlocks.push(invisibleBlock);
+        if (f) invisibleBlock.setData('action', f);
+    }
+
+    // Função auxiliar para criar um objeto de interrogação e armazená-lo no grupo
+    function createQuestionMark(x, y, action) {
+        let questionMark = questionMarksGroup.create(x, y, 'questionMark');
+        questionMark.setData('action', () => action(this));
+        return questionMark;
+    }
+
+    // Função para manipular blocos invisíveis quando o jogador colide com eles
+    function revealBlock(player, block, call) {
+        block.setVisible(true).setActive(true);
+        call.physics.add.collider(player, block);
+        // Aqui você pode adicionar qualquer lógica adicional quando o bloco se torna visível
+    }
+
+    // Função para coletar objetos de interrogação
+    function collectQuestionMark(player, questionMark) {
+        // Remover o objeto de interrogação quando coletado
+        questionMark.disableBody(true, true);
+
+        // Executar a função associada ao objeto de interrogação
+        let action = questionMark.getData('action');
+        if (action) {
+            action();
+        }
+    }
+
+    coins = 0;
+
+    // Função update() para o ciclo de jogo
+    function update() {
+        // Lógica de controle do jogador (exemplo básico)
+        const cursors = this.input.keyboard.createCursorKeys();
+
+        if (cursors.left.isDown) {
+            player.setVelocityX(-250); // Movimento para a esquerda
+            player.setFlipX(true);
+        } else if (cursors.right.isDown) {
+            player.setVelocityX(250); // Movimento para a direita
+            player.setFlipX(false);
+        } else {
+            player.setVelocityX(0); // Parado
+        }
+
+        if (cursors.up.isDown && player.body.touching.down) {
+            player.setVelocityY(-450 / 4 * 3); // Pulando, com controle da altura do pulo
+        }
+
+    // Iterar sobre os blocos invisíveis para aplicar lógica específica
+    invisibleBlocks.forEach((block) => {
+        // Exemplo: verificar se o jogador está tocando o bloco invisível
+        if (Phaser.Geom.Intersects.RectangleToRectangle(player.getBounds(), block.getBounds()) && player.y > block.y + 16 && !block.visible) {
+            revealBlock(player, block, this);
+            if (block.getData('action')) block.getData('action')(this);
+            if (!block.getData('action')) coins++;
+        }
+    }, this);
+
+    elapsedTime = Math.floor((new Date() - startTime) / 1000);
+
+        if (player.y >= 1300) {
+            gameover(this, true);
+        }
+    }
+
+    function gameover(call, type) {
+        gt = call.add.text(player.x - 200, (type ? 700 : player.y), 'GAME --- OVER', { fontFamily: 'Arial', fontSize: '50px', color: '#ff0000' });
+        call.scene.pause();
+    }
+
+    function win(player, flag) {
+        this.add.text(player.x - 200, player.y, 'you win!\ncoins: ' + coins + '\ntime: ' + elapsedTime + '\n', { fontFamily: 'Arial', fontSize: '50px', color: '#00ff00' });
+    }
+})();
+</script>
+</body>
+</html>
